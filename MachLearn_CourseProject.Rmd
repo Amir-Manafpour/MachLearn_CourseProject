@@ -1,0 +1,20 @@
+---
+title: "MachLearn_CourseProject"
+author: "Amir Manafpour"
+date: "5/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exploratory Data Analysis
+
+## Model Development
+
+## Cross Validation
+
+## What is expeceted out of sample error is?
+
+## Why you made the choices you did?
