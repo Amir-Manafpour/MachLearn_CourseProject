@@ -6,10 +6,30 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+library(caret)
 ```
 
+## Executive Summary
+
 ## Exploratory Data Analysis
+
+```{r import-analysis}
+df <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"))
+df.20tests <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
+
+# Split available data into 80% training and 20% testing sets
+set.seed(3234)
+inTrain <- createDataPartition(y=df$classe, p=0.80, list=FALSE)
+training <- df[inTrain,]
+testing <- df[-inTrain,]
+
+# 253 observations have NA values for a lot of the columns, consider removing them
+nacnt <- apply(training, 2, function(x) sum(is.na(x)))
+nacnt[which(nacnt!=0)]
+
+training.nonNA = training[which(training$amplitude_pitch_belt!="NA"),]
+```
 
 ## Model Development
 
