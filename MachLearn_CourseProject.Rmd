@@ -1,22 +1,26 @@
 ---
-title: "MachLearn_CourseProject"
+title: "Classifying Correctness of Barbel Lifts Using Monitoring Device Data"
 author: "Amir Manafpour"
-date: "5/11/2020"
+date: "5/13/2020"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 library(caret)
+library(dplyr)
 ```
 
 ## Executive Summary
 
-## Exploratory Data Analysis
+This study develops and evaluates a random forest prediction model to predit if an individual is performing barbell lifts correctly or incorrectly.  The dataset was obtained from this source: http://groupware.les.inf.puc-rio.br/har and it consists of data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. At the end of the study a test set of 20 samples were utilized to predict the action class and to answer quiz questions for the Practical Machine Learning course project on Coursera.
 
-```{r import-analysis}
+## Exploratory Analysis
+
+First, the data is imported, data is split (80% testing set), and a hsitogram of the outcome variable is plotted.
+
+```{r import-split}
 df <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"))
-df.20tests <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
 
 # Split available data into 80% training and 20% testing sets
 set.seed(3234)
@@ -24,17 +28,125 @@ inTrain <- createDataPartition(y=df$classe, p=0.80, list=FALSE)
 training <- df[inTrain,]
 testing <- df[-inTrain,]
 
-# 253 observations have NA values for a lot of the columns, consider removing them
-nacnt <- apply(training, 2, function(x) sum(is.na(x)))
-nacnt[which(nacnt!=0)]
-
-training.nonNA = training[which(training$amplitude_pitch_belt!="NA"),]
+# Plot the historgram of outcome variable
+qplot(as.factor(training$classe), main = "Distribution of Outcome Variable of Training Set", xlab = "classe", ylab = "Frequency")
 ```
 
-## Model Development
+Based on the histogram above, the distrubution between the different classes of the outcome variable are in the same range for B to E and more for A. Class A is the correct method of doing the exercise and classes B to E are the incorrect ways. And so the higher number of class A results is acceptable for this dataset.
 
-## Cross Validation
 
-## What is expeceted out of sample error is?
+### Missing and NA
 
-## Why you made the choices you did?
+There is a signficant amount of NA and empty values in the training dataset. It so happens all the NA/empty values in these varibles occur when new_window == "yes". These variables are identified below and also the NA/empty values are evaluated for the remainder of the data (new_window == "no").
+
+```{r na-missing-values}
+# Evaluate subset of training data with new_window == "no"
+train.nw.no <- training[training$new_window=="no",]
+nacnt.nw.no <- apply(train.nw.no, 2, function(x) sum(is.na(x)))
+emptycnt.nw.no <- apply(train.nw.no, 2, function(x) sum(x==""))
+table(nacnt.nw.no[nacnt.nw.no!=0])
+table(emptycnt.nw.no[emptycnt.nw.no!=0])
+
+# Evaluate remaining data (new_window == "yes")
+train.nw.yes <- training[training$new_window=="yes",]
+nacnt.nw.yes <- apply(train.nw.yes, 2, function(x) sum(is.na(x)))
+emptycnt.nw.yes <- apply(train.nw.yes, 2, function(x) sum(x==""))
+sum(nacnt.nw.yes!=0)
+sum(emptycnt.nw.yes!=0)
+```
+
+Based on the results above, when new_window == "yes" 67 variables have all NA values and 33 variables have all empty values. The remaining data (new_window == "no") do not have any variables that are all NA/empty values. So in conclusion, 100 variables have 98% empty/NA values (15,377 entries out of 15,699 total entries).
+
+# Pre-processing
+
+Based on the Exploratory Analysis above, to avoid issues during modeling, the following will be removed from the training dataset:
+
+* Variables with 98% NA/empty values
+* The 322 records with new_window == "yes" values especially considering the 20 quiz questions all have new_window == "no" anyways 
+* The near-zero variance variable "new_window"
+
+```{r filter-dataset}
+# Remove variables with primarily NA and empty values
+nacnt <- apply(training, 2, function(x) sum(is.na(x)))
+train.filtered <- training[,-which(nacnt!=0)]
+
+emptycnt <- apply(train.filtered, 2, function(x) sum(x==""))
+train.filtered <- train.filtered[,-which(emptycnt>0)]
+
+# Remove rows with new_window == "yes"
+train.filtered <- train.filtered[-which(train.filtered$new_window=="yes"),]
+
+# Remove new_window variable
+train.filtered <- subset(train.filtered, select = -c(new_window))
+```
+
+Finally the correlation between remaining variables are reviewed below. Even though 22 of the variables have high correlation (.75), enough is not known about which variables to eliminate and which to keep. And so, all variables will be included when model fitting and the modeling algorithm will decide which of the highly correlated variables to include in the model.
+
+```{r correlation-analysis}
+# Check for high correlation among numeric predictors
+train.numeric.only <- select_if(train.filtered, is.numeric)
+trainCor <- cor(train.numeric.only)
+highCorVars <- findCorrelation(trainCor, cutoff = .75)
+length(highCorVars)
+```
+
+### Near-zero variance
+
+Next, the near-zero variance variables were analyzed and none of the remaining variables had near-zero variance.
+
+```{r nzv-analysis}
+# Check for near zero variance variables
+nzv <- nearZeroVar(train.filtered, saveMetrics = T)
+nzv[nzv$nzv==TRUE,]
+```
+
+## Model Fitting and Validation
+
+The random forest modeling method was selected for this dataset. The following criteria was utilized:
+
+* Default resampling method used: bootstrapping with 25 repetitions
+* Default mtry setting (number of variables randomly sampled at each split) used for fine tuning
+
+```{r modeling}
+# Fit random forest model to data first
+mdl.rf <- train(classe ~., method = "rf", data = train.filtered)
+mdl.rf
+mdl.rf$finalModel
+```
+
+Based on the results above we can conclude the following:
+
+* 500 trees were used to develop the random forest model
+* All 3 values tested for mtry resulted in very high accuracies. So further fine tuning of this parameter doesn't appear to have a significant effect.
+* The final selected model only misclassified 1 entry out of the 15,699 samples
+* The estimate OOB error rate is extremely low (0.01%)
+
+These results indicate a highly accurate model but this needed to be further validated using the untouched testing set as follows.
+
+```{r validation}
+# Evaluate model prediction accuracy on testing set
+pred <- predict(mdl.rf, newdata = testing)
+confusionMatrix(pred, as.factor(testing$classe))
+```
+
+The prediction results actually resulted in a 0% error on the testing data set which further proves the high accuracy of this model.
+
+## Conclusion
+
+Considering the in sample and out-of-sample error rates for the training and testing sub-samples of the data were so close to 0%, we can conclude with high confidence that the obtained model is sufficiently accurate and no further fine tuning of the model will be required. 
+
+### Regarding Cross Validation
+
+Cross-validation was used to split the data into training/testing sets and to validate the model developed based on the training set (80% of samples) using the testing (set).
+
+For modeling purposes using the Random Forests method, bootstrapping was utilized for resampling instead of cross-validation.
+
+### Quiz Answers
+
+The same model developed is used to obtain the quiz answers using the "pml-testing.csv" dataset as follows:
+
+```{r quiz-answers}
+df.20tests <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
+quiz.predictions <- predict(mdl.rf, newdata = df.20tests)
+quiz.predictions
+```
