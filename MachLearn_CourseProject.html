@@ -421,6 +421,7 @@ sum(nacnt.nw.yes!=0)</code></pre>
 <li>Variables with 98% NA/empty values</li>
 <li>The 322 records with new_window == “yes” values especially considering the 20 quiz questions all have new_window == “no” anyways</li>
 <li>The near-zero variance variable “new_window”</li>
+<li>The first 6 variables of the dataset including the new_window variable</li>
 </ul>
 <pre class="r"><code># Remove variables with primarily NA and empty values
 nacnt &lt;- apply(training, 2, function(x) sum(is.na(x)))
@@ -432,15 +433,15 @@ train.filtered &lt;- train.filtered[,-which(emptycnt&gt;0)]
 # Remove rows with new_window == &quot;yes&quot;
 train.filtered &lt;- train.filtered[-which(train.filtered$new_window==&quot;yes&quot;),]
 
-# Remove new_window variable
-train.filtered &lt;- subset(train.filtered, select = -c(new_window))</code></pre>
+# Remove first six variables
+train.filtered &lt;- train.filtered[,-c(1:6)]</code></pre>
 <p>Finally the correlation between remaining variables are reviewed below. Even though 22 of the variables have high correlation (.75), enough is not known about which variables to eliminate and which to keep. And so, all variables will be included when model fitting and the modeling algorithm will decide which of the highly correlated variables to include in the model.</p>
 <pre class="r"><code># Check for high correlation among numeric predictors
 train.numeric.only &lt;- select_if(train.filtered, is.numeric)
 trainCor &lt;- cor(train.numeric.only)
 highCorVars &lt;- findCorrelation(trainCor, cutoff = .75)
 length(highCorVars)</code></pre>
-<pre><code>## [1] 22</code></pre>
+<pre><code>## [1] 21</code></pre>
 <div id="near-zero-variance" class="section level3">
 <h3>Near-zero variance</h3>
 <p>Next, the near-zero variance variables were analyzed and none of the remaining variables had near-zero variance.</p>
@@ -463,7 +464,7 @@ mdl.rf</code></pre>
 <pre><code>## Random Forest 
 ## 
 ## 15377 samples
-##    58 predictor
+##    53 predictor
 ##     5 classes: &#39;A&#39;, &#39;B&#39;, &#39;C&#39;, &#39;D&#39;, &#39;E&#39; 
 ## 
 ## No pre-processing
@@ -472,28 +473,54 @@ mdl.rf</code></pre>
 ## Resampling results across tuning parameters:
 ## 
 ##   mtry  Accuracy   Kappa    
-##    2    0.9948107  0.9934368
-##   41    0.9998382  0.9997954
-##   80    0.9997960  0.9997420
+##    2    0.9929939  0.9911376
+##   27    0.9964987  0.9955716
+##   53    0.9927554  0.9908359
 ## 
 ## Accuracy was used to select the optimal model using the largest value.
-## The final value used for the model was mtry = 41.</code></pre>
+## The final value used for the model was mtry = 27.</code></pre>
 <pre class="r"><code>mdl.rf$finalModel</code></pre>
 <pre><code>## 
 ## Call:
 ##  randomForest(x = x, y = y, mtry = param$mtry) 
 ##                Type of random forest: classification
 ##                      Number of trees: 500
-## No. of variables tried at each split: 41
+## No. of variables tried at each split: 27
 ## 
-##         OOB estimate of  error rate: 0.01%
+##         OOB estimate of  error rate: 0.16%
 ## Confusion matrix:
 ##      A    B    C    D    E  class.error
-## A 4378    0    0    0    0 0.0000000000
-## B    1 2977    0    0    0 0.0003357958
-## C    0    0 2676    0    0 0.0000000000
-## D    0    0    0 2516    0 0.0000000000
-## E    0    0    0    0 2829 0.0000000000</code></pre>
+## A 4377    1    0    0    0 0.0002284148
+## B    6 2967    4    1    0 0.0036937542
+## C    0    4 2672    0    0 0.0014947683
+## D    0    0    4 2511    1 0.0019872814
+## E    0    0    0    3 2826 0.0010604454</code></pre>
+<pre class="r"><code>varImp(mdl.rf)</code></pre>
+<pre><code>## rf variable importance
+## 
+##   only 20 most important variables shown (out of 53)
+## 
+##                      Overall
+## num_window           100.000
+## roll_belt             60.995
+## pitch_forearm         38.217
+## yaw_belt              30.254
+## magnet_dumbbell_z     27.738
+## magnet_dumbbell_y     27.721
+## pitch_belt            26.595
+## roll_forearm          21.289
+## accel_dumbbell_y      11.508
+## magnet_dumbbell_x     11.006
+## roll_dumbbell         10.266
+## accel_forearm_x        9.555
+## accel_belt_z           8.882
+## total_accel_dumbbell   8.788
+## accel_dumbbell_z       8.090
+## magnet_belt_y          7.947
+## magnet_belt_z          7.034
+## magnet_forearm_z       6.218
+## magnet_belt_x          5.711
+## roll_arm               5.000</code></pre>
 <p>Based on the results above we can conclude the following:</p>
 <ul>
 <li>500 trees were used to develop the random forest model</li>
@@ -502,41 +529,41 @@ mdl.rf</code></pre>
 <li>The estimate OOB error rate is extremely low (0.01%)</li>
 </ul>
 <p>These results indicate a highly accurate model but this needed to be further validated using the untouched testing set as follows.</p>
-<pre class="r"><code># Evaluate model prediction accuracy on testing set
-pred &lt;- predict(mdl.rf, newdata = testing)
+<pre class="r"><code># Evaluate model prediction accuracy on testing set</code></pre>
+<pre class="r"><code>pred &lt;- predict(mdl.rf, newdata = testing)
 confusionMatrix(pred, as.factor(testing$classe))</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1116    0    0    0    0
-##          B    0  759    0    0    0
-##          C    0    0  684    0    0
-##          D    0    0    0  643    0
-##          E    0    0    0    0  721
+##          A 1115    0    0    0    0
+##          B    1  759    2    0    0
+##          C    0    0  682    6    0
+##          D    0    0    0  637    3
+##          E    0    0    0    0  718
 ## 
 ## Overall Statistics
-##                                      
-##                Accuracy : 1          
-##                  95% CI : (0.9991, 1)
-##     No Information Rate : 0.2845     
-##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16  
-##                                      
-##                   Kappa : 1          
-##                                      
-##  Mcnemar&#39;s Test P-Value : NA         
+##                                           
+##                Accuracy : 0.9969          
+##                  95% CI : (0.9947, 0.9984)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.9961          
+##                                           
+##  Mcnemar&#39;s Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            1.0000   1.0000   1.0000   1.0000   1.0000
-## Specificity            1.0000   1.0000   1.0000   1.0000   1.0000
-## Pos Pred Value         1.0000   1.0000   1.0000   1.0000   1.0000
-## Neg Pred Value         1.0000   1.0000   1.0000   1.0000   1.0000
+## Sensitivity            0.9991   1.0000   0.9971   0.9907   0.9958
+## Specificity            1.0000   0.9991   0.9981   0.9991   1.0000
+## Pos Pred Value         1.0000   0.9961   0.9913   0.9953   1.0000
+## Neg Pred Value         0.9996   1.0000   0.9994   0.9982   0.9991
 ## Prevalence             0.2845   0.1935   0.1744   0.1639   0.1838
-## Detection Rate         0.2845   0.1935   0.1744   0.1639   0.1838
-## Detection Prevalence   0.2845   0.1935   0.1744   0.1639   0.1838
-## Balanced Accuracy      1.0000   1.0000   1.0000   1.0000   1.0000</code></pre>
+## Detection Rate         0.2842   0.1935   0.1738   0.1624   0.1830
+## Detection Prevalence   0.2842   0.1942   0.1754   0.1631   0.1830
+## Balanced Accuracy      0.9996   0.9995   0.9976   0.9949   0.9979</code></pre>
 <p>The prediction results actually resulted in a 0% error on the testing data set which further proves the high accuracy of this model.</p>
 </div>
 <div id="conclusion" class="section level2">
@@ -553,7 +580,7 @@ confusionMatrix(pred, as.factor(testing$classe))</code></pre>
 <pre class="r"><code>df.20tests &lt;- read.csv(url(&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;))
 quiz.predictions &lt;- predict(mdl.rf, newdata = df.20tests)
 quiz.predictions</code></pre>
-<pre><code>##  [1] A A A A A A A A A A A A A A A A A A A A
+<pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
 ## Levels: A B C D E</code></pre>
 </div>
 </div>

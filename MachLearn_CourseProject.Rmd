@@ -64,6 +64,7 @@ Based on the Exploratory Analysis above, to avoid issues during modeling, the fo
 * Variables with 98% NA/empty values
 * The 322 records with new_window == "yes" values especially considering the 20 quiz questions all have new_window == "no" anyways 
 * The near-zero variance variable "new_window"
+* The first 6 variables of the dataset including the new_window variable
 
 ```{r filter-dataset}
 # Remove variables with primarily NA and empty values
@@ -76,8 +77,8 @@ train.filtered <- train.filtered[,-which(emptycnt>0)]
 # Remove rows with new_window == "yes"
 train.filtered <- train.filtered[-which(train.filtered$new_window=="yes"),]
 
-# Remove new_window variable
-train.filtered <- subset(train.filtered, select = -c(new_window))
+# Remove first six variables
+train.filtered <- train.filtered[,-c(1:6)]
 ```
 
 Finally the correlation between remaining variables are reviewed below. Even though 22 of the variables have high correlation (.75), enough is not known about which variables to eliminate and which to keep. And so, all variables will be included when model fitting and the modeling algorithm will decide which of the highly correlated variables to include in the model.
@@ -112,6 +113,7 @@ The random forest modeling method was selected for this dataset. The following c
 mdl.rf <- train(classe ~., method = "rf", data = train.filtered)
 mdl.rf
 mdl.rf$finalModel
+varImp(mdl.rf)
 ```
 
 Based on the results above we can conclude the following:
